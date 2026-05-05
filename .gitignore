@@ -1,17 +1,19 @@
 # Dependencies
 node_modules/
 frontend/node_modules/
-
-# Build artifacts
 dist/
 frontend/dist/
 build/
-coverage/
+.next/
+out/
 
 # Environment Variables
-.env
+.enva
 .env.local
 .env.*.local
+.env.development
+.env.test
+.env.production
 *.env
 
 # Databases
@@ -20,28 +22,32 @@ coverage/
 devmind.db
 
 # Logs
+logs
 *.log
 npm-debug.log*
 yarn-debug.log*
-
-# IDEs and Editors
-.vscode/
-.idea/
-*.swp
-*.swo
+yarn-error.log*
+pnpm-debug.log*
 
 # OS Files
 .DS_Store
 Thumbs.db
 
-# Project Specific
-test-webhook.js
-src/agent/temp_*
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Antigravity/Agent Internals
+# Antigravity/Agent specific
 .gemini/
 .antigravity/
 knowledge/
 brain/
 artifacts/
 scratch/
+
+# Miscellaneous
+test-webhook.js
+coverage/
+.vercel

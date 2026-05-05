@@ -1,2 +1,84 @@
-# DevMind Memory
-This file is reserved for persistent project context. It will be updated by the OpenClaw agent during execution to maintain a history of architectural decisions and long-term project insights.
+This file contains persistent project context generated dynamically by the Repo X-Ray.
+
+# Repository Architecture Overview
+- **Core Technology Stack**: better-sqlite3, cors, dotenv, express, groq-sdk, helmet, node-cron, simple-git, socket.io, tree-sitter...
+- **Entry Points**: package.json (Dependencies), App.jsx (Entry Point), main.jsx (Entry Point), package.json (Dependencies), index.js (Entry Point)
+- **Project Structure**:
+📄 .env
+📄 .env.example
+📄 .gitignore
+📄 backend_err.log
+📄 backend_out.log
+📄 devmind.db
+📄 DevMinds_MS Ramaiah Institute of Technology.pdf
+📁 docs/
+  📄 enterprise-features-scaffold.md
+📁 frontend/
+  📄 .gitignore
+  📄 eslint.config.js
+  📄 index.html
+  📄 package.json
+  📁 public/
+    📄 favicon.svg
+    📄 icons.svg
+  📄 README.md
+  📁 src/
+    📄 App.css
+    📄 App.jsx
+    📁 assets/
+      📄 hero.png
+      📄 react.svg
+      📄 vite.svg
+    📁 components/
+      📄 ArchitectureMapper.jsx
+      📄 AskAgentWalkthrough.jsx
+      📄 ChatBot.jsx
+      📄 InsightCard.jsx
+      📄 LiveTerminal.jsx
+      📄 PRTimeline.jsx
+    📄 index.css
+    📄 main.jsx
+    📁 pages/
+      📄 DashboardPage.jsx
+      📄 HomePage.jsx
+    📁 services/
+      📄 socket.js
+  📄 vite.config.js
+📄 package.json
+📄 scratch_pdf_content.txt
+📁 src/
+  📁 agent/
+    📄 MEMORY.md
+    📄 SKILL.md
+    📄 SOUL.md
+    📄 temp_prompt.txt
+    📄 temp_runner.sh
+  📁 config/
+    📄 db.js
+  📄 index.js
+  📁 routes/
+    📄 analyzeRepo.js
+    📄 chat.js
+    📄 enterprise.js
+    📄 history.js
+    📄 webhooks.js
+  📁 services/
+    📄 agentService.js
+    📄 chatService.js
+    📁 enterprise/
+      📄 edgeResourceManager.js
+      📄 gerritJiraAdapters.js
+      📄 hybridContextMemory.js
+      📄 liveWalkthrough.js
+      📄 sastScanner.js
+      📄 smartDiffChunker.js
+      📄 technicalDebtModel.js
+      📄 treeSitterParser.js
+    📄 heartbeatService.js
+    📄 mcpClient.js
+    📄 repoAnalyzer.js
+    📄 telegramService.js
+📁 temp-repos/
+  📁 ayk7115_freelancer_scheduler/
+📄 test-telegram.js
+📄 test-webhook.js
