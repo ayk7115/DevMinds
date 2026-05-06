@@ -303,6 +303,37 @@ h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; font-weight: 600; color: var
   border-radius: 20px;
   font-size: 0.78rem;
 }
+.xray-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+  list-style: none;
+}
+.xray-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  word-break: break-word;
+}
+.xray-method {
+  min-width: 48px;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #000;
+  background: var(--accent-primary);
+  border-radius: 6px;
+  padding: 0.1rem 0.35rem;
+}
+.xray-risk {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  padding-left: 0.1rem;
+}
 
 /* ─── PR Timeline ─── */
 .timeline-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0; padding-right: 0.25rem; }
@@ -394,7 +425,7 @@ h1, h2, h3, h4 { font-family: 'Outfit', sans-serif; font-weight: 600; color: var
 /* ─── Homepage ─── */
 .home-page { min-height: 100vh; display: flex; flex-direction: column; }
 
-.home-header {
+.home-navbar {
   padding: 0 2rem;
   background: rgba(8,10,15,0.95);
   border-bottom: var(--glass-border);

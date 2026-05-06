@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Clock, CheckCircle, AlertTriangle, XCircle, GitPullRequest } from 'lucide-react';
+import { Clock, CheckCircle, AlertTriangle, XCircle, GitPullRequest, FolderGit2 } from 'lucide-react';
+import { socket } from '../services/socket';
 
 const parseRawOutput = (rawOutput) => {
   if (!rawOutput) return {};
@@ -10,17 +11,31 @@ const parseRawOutput = (rawOutput) => {
   }
 };
 
-export default function PRTimeline({ onSelectInsight }) {
+export default function PRTimeline({ onSelectInsight, filterRepo }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/history')
-      .then(r => r.json())
-      .then(data => { setHistory(data); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+    const fetchHistory = () => {
+      const url = filterRepo 
+        ? `http://localhost:3000/api/history?repo=${encodeURIComponent(filterRepo)}`
+        : 'http://localhost:3000/api/history';
+        
+      fetch(url)
+        .then(r => r.json())
+        .then(data => { setHistory(data); setLoading(false); })
+        .catch(() => setLoading(false));
+    };
+
+    fetchHistory();
+
+    socket.on('agent:complete', fetchHistory);
+
+    return () => {
+      socket.off('agent:complete', fetchHistory);
+    };
+  }, [filterRepo]);
 
   const getScoreColor = (score) => {
     if (score >= 80) return 'var(--success)';
@@ -28,7 +43,8 @@ export default function PRTimeline({ onSelectInsight }) {
     return 'var(--error)';
   };
 
-  const getScoreIcon = (score) => {
+  const getScoreIcon = (score, isScan) => {
+    if (isScan) return <FolderGit2 size={16} color="var(--accent-primary)" />;
     if (score >= 80) return <CheckCircle size={16} color="var(--success)" />;
     if (score >= 50) return <AlertTriangle size={16} color="var(--warning)" />;
     return <XCircle size={16} color="var(--error)" />;
@@ -85,7 +101,7 @@ export default function PRTimeline({ onSelectInsight }) {
               <div className="timeline-content">
                 <div className="timeline-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {getScoreIcon(row.readiness_score)}
+                    {getScoreIcon(row.readiness_score, row.author === 'Repo X-Ray')}
                     <span className="timeline-title">{row.title}</span>
                   </div>
                   <div className="timeline-score" style={{ color: getScoreColor(row.readiness_score) }}>

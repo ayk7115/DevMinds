@@ -1,7 +1,11 @@
 import express from 'express';
-import { chat } from '../services/chatService.js';
+import { chat, getChatStatus } from '../services/chatService.js';
 
 const router = express.Router();
+
+router.get('/status', (req, res) => {
+    res.status(200).json(getChatStatus());
+});
 
 /**
  * POST /api/chat
@@ -20,7 +24,12 @@ router.post('/', async (req, res) => {
         res.status(200).json({ reply });
     } catch (error) {
         console.error('[ChatRoute] Groq chat error:', error);
-        res.status(500).json({ error: `Chat service error: ${error.message}` });
+        const status = error.code === 'GROQ_NOT_CONFIGURED' ? 503 : 502;
+        res.status(status).json({
+            error: error.message || 'Groq chat request failed.',
+            code: error.code || 'GROQ_REQUEST_FAILED',
+            model: getChatStatus().model
+        });
     }
 });
 

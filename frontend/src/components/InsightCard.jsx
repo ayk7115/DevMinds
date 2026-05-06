@@ -78,18 +78,63 @@ export default function InsightCard({ insights }) {
       
       <div className="insight-content">
         
-        {/* Readiness Score Widget (Visible in both) */}
-        <div className="score-widget">
-          <div>
-            <div className="detail-title">Deployment Confidence</div>
-            <div className="detail-text" style={{ fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
-              Score
+        {/* Readiness Score Widget */}
+        <div className="score-widget-container" style={{ marginBottom: '1.5rem' }}>
+          <div className="score-widget">
+            <div>
+              <div className="detail-title">Deployment Confidence</div>
+              <div className="detail-text" style={{ fontSize: '1.5rem', fontWeight: 600, color: 'white' }}>
+                Score
+              </div>
+            </div>
+            <div className={`score-circle ${getScoreClass(insights.readinessScore)}`}>
+              {insights.readinessScore}
             </div>
           </div>
-          <div className={`score-circle ${getScoreClass(insights.readinessScore)}`}>
-            {insights.readinessScore}
-          </div>
+
+          {/* Breakdown Visualization */}
+          {insights.readinessScoreBreakdown && insights.readinessScoreBreakdown.length > 0 && (
+            <div className="score-breakdown" style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {insights.readinessScoreBreakdown.map((item, idx) => (
+                <div key={idx} className="breakdown-item">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem', fontSize: '0.75rem' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{item.category}</span>
+                    <span style={{ color: 'white', fontWeight: 600 }}>{item.score}%</span>
+                  </div>
+                  <div className="progress-bg" style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div 
+                      className={`progress-fill ${getScoreClass(item.score)}`} 
+                      style={{ width: `${item.score}%`, height: '100%', transition: 'width 1s ease-out' }}
+                    ></div>
+                  </div>
+                  {item.rationale && (
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.25rem', fontStyle: 'italic' }}>
+                      {item.rationale}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Improvement Plan for Low Scores */}
+        {insights.readinessScore < 85 && (
+          <div className="detail-section" style={{ borderLeftColor: 'var(--warning)', background: 'rgba(245,158,11,0.03)' }}>
+            <div className="detail-title" style={{ color: 'var(--warning)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Strategic Improvement Plan
+            </div>
+            <div className="detail-text" style={{ fontSize: '0.85rem' }}>
+              To reach 90+ confidence, the following actions are recommended:
+              <ul style={{ marginTop: '0.5rem', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {insights.readinessScoreBreakdown?.filter(b => b.score < 80).map((b, i) => (
+                  <li key={i}>Address <strong>{b.category}</strong>: {b.rationale || `Improve ${b.category.toLowerCase()} to mitigate deployment risks.`}</li>
+                )) || <li>Perform manual code review and verify security impact.</li>}
+                <li>Execute regression test suite on staging environment.</li>
+              </ul>
+            </div>
+          </div>
+        )}
 
         {persona === 'business' ? (
           /* Business Persona View */

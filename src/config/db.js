@@ -6,7 +6,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dbPath = path.resolve(__dirname, '../../devmind.db');
 
 // Initialize SQLite database
-const db = new Database(dbPath, { verbose: console.log });
+const verbose = process.env.SQLITE_VERBOSE === 'true' ? console.log : null;
+const db = new Database(dbPath, { verbose });
 
 // Create the insights table if it doesn't exist
 db.exec(`

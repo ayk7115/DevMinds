@@ -1,128 +1,70 @@
+import 'dotenv/config';
+
 /**
  * Telegram Service
- * Handles delivery of PR insights and weekly digests to stakeholders.
+ * Handles notification delivery and formatting.
  */
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const TELEGRAM_MESSAGE_LIMIT = 4096;
-
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;'
-};
-
-export const escapeTelegramHtml = (value = '') => {
-    return String(value ?? '').replace(/[&<>]/g, char => HTML_ESCAPE_MAP[char]);
-};
-
-const truncateMessage = (text) => {
-    const value = String(text ?? '');
-    if (value.length <= TELEGRAM_MESSAGE_LIMIT) return value;
-    return `${value.slice(0, TELEGRAM_MESSAGE_LIMIT - 32)}\n\n[message truncated]`;
-};
-
-const htmlToPlainText = (html) => {
-    return String(html ?? '')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/p>/gi, '\n')
-        .replace(/<a\b[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gi, '$2 ($1)')
-        .replace(/<[^>]+>/g, '')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&');
-};
-
-/**
- * Sends a message to the configured Telegram chat.
- * Callers can pass parseMode: 'HTML' only after escaping dynamic values.
- */
-export const sendTelegramMessage = async (text, options = {}) => {
-    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-        console.warn('[TelegramService] Missing credentials. Skipping message delivery.');
-        return;
-    }
-
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-    const payload = {
-        chat_id: TELEGRAM_CHAT_ID,
-        text: truncateMessage(text),
-        disable_web_page_preview: options.disableWebPagePreview ?? true
+export const getTelegramStatus = () => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    return {
+        configured: Boolean(token && chatId),
+        hasToken: Boolean(token),
+        hasChatId: Boolean(chatId)
     };
+};
 
-    if (options.parseMode) {
-        payload.parse_mode = options.parseMode;
+export const sendTelegramMessage = async (text, options = {}) => {
+    const { TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } = process.env;
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+        console.warn('[TelegramService] Delivery skipped: Not configured.');
+        return { ok: false, error: 'Not configured' };
     }
 
     try {
-        const response = await fetch(url, {
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+        const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                text,
+                parse_mode: options.parseMode || 'HTML',
+                ...options
+            })
         });
 
-        const data = await response.json();
-
-        if (!data.ok) {
-            console.error('[TelegramService] Telegram API error:', data.description);
-
-            if (options.parseMode && /parse entities|entity/i.test(data.description || '')) {
-                const retryResponse = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: TELEGRAM_CHAT_ID,
-                        text: truncateMessage(htmlToPlainText(text)),
-                        disable_web_page_preview: true
-                    })
-                });
-                const retryData = await retryResponse.json();
-
-                if (!retryData.ok) {
-                    console.error('[TelegramService] Plain-text retry failed:', retryData.description);
-                } else {
-                    console.log('[TelegramService] Message sent successfully as plain text fallback.');
-                }
-
-                return retryData;
-            }
-        } else {
-            console.log('[TelegramService] Message sent successfully.');
-        }
-
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.description || 'Telegram API Error');
         return data;
     } catch (error) {
-        console.error('[TelegramService] Network error:', error);
-        return { ok: false, error };
+        console.error('[TelegramService] Failed to send message:', error.message);
+        return { ok: false, error: error.message };
     }
 };
 
-/**
- * Formats a PR insight for Telegram delivery (Business View).
- */
+export const sendTelegramTestMessage = async () => {
+    const testMsg = `🛠️ <b>DevMind Integration Test</b>\nYour Telegram alerts are now active. You will receive PR insights here.`;
+    return sendTelegramMessage(testMsg);
+};
+
 export const formatPRMessage = (insight, prData) => {
-    const title = escapeTelegramHtml(prData.title);
-    const author = escapeTelegramHtml(prData.author);
-    const repo = escapeTelegramHtml(prData.repo);
-    const readinessScore = escapeTelegramHtml(insight.readinessScore ?? 'N/A');
-    const architecturalImpact = escapeTelegramHtml(insight.architecturalImpact || 'Unknown');
-    const securityRisks = escapeTelegramHtml(insight.securityRisks || 'Unknown');
-    const summary = escapeTelegramHtml(insight.stakeholder_summary || insight.summary || 'Summary not provided');
-    const diffUrl = escapeTelegramHtml(prData.diff_url || '');
-
+    const scoreEmoji = insight.readinessScore >= 80 ? '✅' : insight.readinessScore >= 50 ? '⚠️' : '❌';
+    const impactEmoji = insight.architecturalImpact === 'High' || insight.architecturalImpact === 'Critical' ? '🏗️' : '🔹';
+    
     return `
-<b>New PR Insight:</b> ${title}
-<b>Author:</b> ${author}
-<b>Repo:</b> ${repo}
+${scoreEmoji} <b>DevMind PR Analysis: #${prData.id}</b>
+<b>Title:</b> ${prData.title}
+<b>Author:</b> @${prData.author}
 
-<b>Readiness Score:</b> ${readinessScore}/100
-<b>Arch Impact:</b> ${architecturalImpact}
-<b>Security Risk:</b> ${securityRisks}
+<b>Deployment Readiness:</b> ${insight.readinessScore}/100
+<b>Architectural Impact:</b> ${impactEmoji} ${insight.architecturalImpact}
+<b>Security Risks:</b> ${insight.securityRisks === 'None' ? '🛡️ None' : '⚠️ ' + insight.securityRisks}
 
 <b>Summary:</b>
-${summary}
+${insight.stakeholder_summary || insight.summary || 'No summary provided.'}
 
-${diffUrl ? `<a href="${diffUrl}">View PR Diff</a>` : 'PR diff link unavailable'}
+<a href="${prData.html_url || '#'}">View Pull Request</a>
     `.trim();
 };

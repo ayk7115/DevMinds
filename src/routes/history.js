@@ -9,13 +9,22 @@ const router = express.Router();
  */
 router.get('/', (req, res) => {
     try {
-        const rows = db.prepare(`
+        const repo = req.query.repo;
+        let query = `
             SELECT id, pr_id, repo_name, author, title, readiness_score, summary,
                    architectural_impact, security_risks, raw_output, created_at
             FROM insights
-            ORDER BY created_at DESC
-            LIMIT 50
-        `).all();
+        `;
+        let params = [];
+
+        if (repo) {
+            query += ` WHERE repo_name = ? `;
+            params.push(repo);
+        }
+
+        query += ` ORDER BY created_at DESC LIMIT 50 `;
+
+        const rows = db.prepare(query).all(...params);
         res.status(200).json(rows);
     } catch (error) {
         console.error('[HistoryRoute] Failed to load history:', error);

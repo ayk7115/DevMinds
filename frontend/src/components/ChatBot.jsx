@@ -21,7 +21,15 @@ export default function ChatBot() {
   const [messages, setMessages] = useState(loadChatMessages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(null);
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    fetch('http://localhost:3000/api/chat/status')
+      .then(res => res.json())
+      .then(setStatus)
+      .catch(() => setStatus({ configured: false, model: 'unavailable' }));
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -46,9 +54,17 @@ export default function ChatBot() {
         body: JSON.stringify({ message: text })
       });
       const data = await res.json();
-      setMessages(prev => [...prev, { role: 'assistant', text: data.reply || data.error || 'No response.' }]);
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        text: data.reply || data.error || 'No response.'
+      }]);
+      if (!res.ok) {
+        setStatus(prev => ({ ...(prev || {}), configured: data.code !== 'GROQ_NOT_CONFIGURED', lastError: data.error }));
+      }
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', text: 'Could not reach the chat service. Make sure the backend is running.' }]);
+      const errorText = 'Could not reach the chat service. Make sure the backend is running on http://localhost:3000.';
+      setStatus(prev => ({ ...(prev || {}), configured: false, lastError: errorText }));
+      setMessages(prev => [...prev, { role: 'assistant', text: errorText }]);
     } finally {
       setLoading(false);
     }
@@ -59,8 +75,18 @@ export default function ChatBot() {
       <div className="panel-header">
         <Bot size={20} />
         DevMind AI Chat
-        <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--success)', background: 'rgba(16,185,129,0.1)', padding: '0.2rem 0.6rem', borderRadius: '20px' }}>
-          Groq - llama3-8b
+        <span
+          title={status?.lastError || status?.privacy || ''}
+          style={{
+            marginLeft: 'auto',
+            fontSize: '0.7rem',
+            color: status?.configured ? 'var(--success)' : 'var(--warning)',
+            background: status?.configured ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+            padding: '0.2rem 0.6rem',
+            borderRadius: '20px'
+          }}
+        >
+          Groq - {status?.configured ? (status.model || 'ready') : 'setup needed'}
         </span>
       </div>
 

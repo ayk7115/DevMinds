@@ -9,9 +9,11 @@ import chatRoutes from './routes/chat.js';
 import analyzeRepoRoutes from './routes/analyzeRepo.js';
 import historyRoutes from './routes/history.js';
 import enterpriseRoutes from './routes/enterprise.js';
+import integrationRoutes from './routes/integrations.js';
 import { analyzeRepository } from './services/repoAnalyzer.js';
 import { startHeartbeat } from './services/heartbeatService.js';
 import { registerEnterpriseSocketHandlers } from './services/enterprise/liveWalkthrough.js';
+import { startTelegramBot } from './services/telegramBot.js';
 import path from 'path';
 
 // Initialize Express application
@@ -45,6 +47,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/analyze-repo', analyzeRepoRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/enterprise', enterpriseRoutes);
+app.use('/api/integrations', integrationRoutes);
 
 // Architecture API (Phase 2)
 app.get('/api/architecture', (req, res) => {
@@ -92,4 +95,7 @@ startHeartbeat();
 server.listen(PORT, () => {
     console.log(`[Server] DevMind Backend running on http://localhost:${PORT}`);
     console.log(`[Socket.IO] Real-time engine ready.`);
+    
+    // Start Interactive Telegram Agent
+    startTelegramBot();
 });

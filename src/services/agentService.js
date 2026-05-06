@@ -171,7 +171,7 @@ export const processPullRequest = async (prData, io) => {
             ? similarPrs.map(item => `- ${item.title} (${Math.round(item.similarity * 100)}% similar): ${item.summary}`).join('\n')
             : 'No similar historical PR pattern was found in local vector memory.';
 
-        const fullPrompt = `${soulContent}\n\n${skillContent}\n\n${memoryContent}\n\nAnalyze these prioritized PR diff chunks and output a readinessScore, stakeholder_summary, engineer_changelog, architecturalImpact, and securityRisks in JSON format.\nPR Title: ${prData.title}\n\nLightweight SAST Signals:\n${securityContext}\n\nRecurring Historical Patterns:\n${recurrenceContext}\n\nPrioritized Diff Context:\n${prioritizedDiffContext}`;
+        const fullPrompt = `${soulContent}\n\n${skillContent}\n\n${memoryContent}\n\nAnalyze these prioritized PR diff chunks and output a readinessScore, readinessScoreBreakdown, stakeholder_summary, engineer_changelog, architecturalImpact, and securityRisks in JSON format.\nPR Title: ${prData.title}\n\nLightweight SAST Signals:\n${securityContext}\n\nRecurring Historical Patterns:\n${recurrenceContext}\n\nPrioritized Diff Context:\n${prioritizedDiffContext}`;
 
         // To prevent Windows WSL from treating newlines as separate commands,
         // we write the prompt and a runner script to disk, then execute the script.
@@ -251,6 +251,7 @@ PROMPT=$(cat "${toWslPath(promptFilePath)}")
                 // We map stakeholder_summary to the legacy 'summary' column, and append the changelog to 'raw_output' for persistence
                 const persistedRawOutput = JSON.stringify({
                     changelog: insight.engineer_changelog,
+                    breakdown: insight.readinessScoreBreakdown,
                     raw: fullOutput
                 });
 

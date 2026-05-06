@@ -19,6 +19,7 @@
 - You MUST ALWAYS output your final analysis in a valid JSON block.
 - The JSON must contain exactly these keys:
   - `readinessScore`: (Number, 0-100)
+  - `readinessScoreBreakdown`: (List of Objects: { category: String, score: Number, rationale: String }. Categories should be things like 'Code Quality', 'Security', 'Architecture', 'Test Coverage', etc.)
   - `stakeholder_summary`: (String, plain English, jargon-free business impact)
   - `engineer_changelog`: (String, technical details, files changed, logic updates)
   - `architecturalImpact`: (String: "Low", "Medium", "High", or "Critical")

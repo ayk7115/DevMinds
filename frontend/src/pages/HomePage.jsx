@@ -1,45 +1,60 @@
 import { useNavigate } from 'react-router-dom';
+import { useRef } from 'react';
 import { Activity, GitBranch, Cpu, MessageSquare, GitPullRequest, Shield, Zap, ArrowRight, Terminal, Database, Bot } from 'lucide-react';
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const guideRef = useRef(null);
+
+  const scrollToGuide = () => {
+    if (guideRef.current) {
+      guideRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const steps = [
     {
       num: '01',
       icon: <GitBranch size={24} />,
-      title: 'Connect Your GitHub Repository',
-      desc: 'Go to your GitHub repository → Settings → Webhooks → Add Webhook. Set the Payload URL to your DevMind server endpoint.',
-      code: 'http://YOUR_SERVER:3000/api/webhooks/github'
+      title: 'Repository Ingestion (Repo X-Ray)',
+      desc: 'Simply paste any public GitHub URL into the Repo X-Ray input. DevMind clones the repo to a local temp folder, scans its entire directory structure, extracts API endpoints, and builds a live architectural dependency graph — all in under 60 seconds.',
+      code: 'https://github.com/facebook/react'
     },
     {
       num: '02',
       icon: <Shield size={24} />,
-      title: 'Configure Webhook Secret',
-      desc: 'Set a secret token in GitHub and add it to your .env file. DevMind uses HMAC SHA-256 to verify every incoming request.',
-      code: 'GITHUB_WEBHOOK_SECRET=your_secret_token'
+      title: 'Establish Secure Webhooks',
+      desc: 'Connect your own private repositories by adding a GitHub Webhook. DevMind verifies every payload using HMAC SHA-256 signatures, ensuring only authorized Pull Request events trigger the local AI engine.',
+      code: 'Payload URL: http://your-ip:3000/api/webhooks/github'
     },
     {
       num: '03',
-      icon: <GitPullRequest size={24} />,
-      title: 'Open a Pull Request',
-      desc: 'Create or open a PR in your connected repo. GitHub will automatically fire a webhook — DevMind picks it up instantly.',
-      code: 'git checkout -b feature/my-feature\ngit push origin feature/my-feature'
+      icon: <Cpu size={24} />,
+      title: 'Local AI Sovereignty',
+      desc: 'When a PR is opened, your local Llama-3 model (running on Ollama or local GPU) wakes up. It analyzes the raw diff chunks, identifies architectural impact, and flags security risks without your source code ever leaving your machine.',
+      code: '// Model: Llama-3-8B-Instruct\n// Privacy: 100% Local (Sovereign Mode)'
     },
     {
       num: '04',
-      icon: <Cpu size={24} />,
-      title: 'Local AI Analyzes in Sovereign Mode',
-      desc: 'Your code never leaves your machine. The local Llama-3 model on your GPU processes the diff and generates insights privately.',
-      code: '// Llama-3 (8B) on RTX 4050 — Zero cloud, 100% private'
+      icon: <Terminal size={24} />,
+      title: 'Live Insight Streaming',
+      desc: 'Watch the AI "think" in real-time through the Live Terminal. DevMind calculates a Readiness Score (0-100) based on complexity, security signals, and code quality, giving you immediate deployment confidence.',
+      code: 'socket.emit("agent:stream", { prId: 101, ... })'
     },
     {
       num: '05',
-      icon: <Terminal size={24} />,
-      title: 'View Real-Time Dashboard',
-      desc: 'Stream the live AI analysis, view Deployment Confidence scores, and toggle between Stakeholder and Engineer views.',
-      code: 'http://localhost:5173/dashboard'
+      icon: <Bot size={24} />,
+      title: 'Hybrid Contextual Chat',
+      desc: 'Interact with your codebase through our Tier-2 Chat layer. Powered by Groq, the assistant uses sanitized PR metadata and recent Repo Scans to answer questions about PR history, system health, and architectural gaps.',
+      code: 'Q: "What was the security risk in the last Auth PR?"'
     },
+    {
+      num: '06',
+      icon: <MessageSquare size={24} />,
+      title: 'Omnichannel Alerts',
+      desc: 'Stay informed wherever you are. DevMind delivers high-priority PR insights directly to your Telegram bot and compiles a weekly "Friday Digest" of all repo activity for stakeholders.',
+      code: 'TELEGRAM_BOT_TOKEN=748291...:AAH... '
+    }
   ];
 
   const features = [
@@ -53,8 +68,8 @@ export default function HomePage() {
 
   return (
     <div className="home-page">
-      {/* Hero Section */}
-      <header className="home-header">
+      {/* Navbar */}
+      <header className="home-navbar">
         <nav className="home-nav">
           <div className="home-logo">
             <Activity size={28} color="var(--accent-primary)" />
@@ -64,37 +79,38 @@ export default function HomePage() {
             Open Dashboard <ArrowRight size={16} />
           </button>
         </nav>
-
-        <div className="hero">
-          <div className="hero-badge">Sovereign AI Platform · Powered by Llama-3 + Groq</div>
-          <h1 className="hero-title">
-            Turn Every PR Into<br />
-            <span className="gradient-text">Strategic Intelligence</span>
-          </h1>
-          <p className="hero-desc">
-            DevMind is a locally-sovereign AI platform that automatically analyzes GitHub Pull Requests,
-            generates architectural insights, and delivers business-grade reports — all without your code
-            ever touching the cloud.
-          </p>
-          <div className="hero-actions">
-            <button className="btn-primary btn-lg" onClick={() => navigate('/dashboard')}>
-              <Activity size={20} /> Launch Dashboard
-            </button>
-            <button className="btn-ghost btn-lg" onClick={() => document.getElementById('guide').scrollIntoView({ behavior: 'smooth' })}>
-              How It Works
-            </button>
-          </div>
-          <div className="hero-stats">
-            <div className="stat"><span>100%</span><p>Local Processing</p></div>
-            <div className="stat-divider" />
-            <div className="stat"><span>6GB</span><p>GPU Footprint</p></div>
-            <div className="stat-divider" />
-            <div className="stat"><span>&lt;2s</span><p>Groq Chat Response</p></div>
-            <div className="stat-divider" />
-            <div className="stat"><span>0</span><p>Cloud Code Exposure</p></div>
-          </div>
-        </div>
       </header>
+
+      {/* Hero Section */}
+      <section className="hero">
+        <div className="hero-badge">Sovereign AI Platform · Powered by Llama-3 + Groq</div>
+        <h1 className="hero-title">
+          Turn Every PR Into<br />
+          <span className="gradient-text">Strategic Intelligence</span>
+        </h1>
+        <p className="hero-desc">
+          DevMind is a locally-sovereign AI platform that automatically analyzes GitHub Pull Requests,
+          generates architectural insights, and delivers business-grade reports — all without your code
+          ever touching the cloud.
+        </p>
+        <div className="hero-actions">
+          <button className="btn-primary btn-lg" onClick={() => navigate('/dashboard')}>
+            <Activity size={20} /> Launch Dashboard
+          </button>
+          <button className="btn-ghost btn-lg" onClick={scrollToGuide}>
+            How It Works
+          </button>
+        </div>
+        <div className="hero-stats">
+          <div className="stat"><span>100%</span><p>Local Processing</p></div>
+          <div className="stat-divider" />
+          <div className="stat"><span>6GB</span><p>GPU Footprint</p></div>
+          <div className="stat-divider" />
+          <div className="stat"><span>&lt;2s</span><p>Groq Chat Response</p></div>
+          <div className="stat-divider" />
+          <div className="stat"><span>0</span><p>Cloud Code Exposure</p></div>
+        </div>
+      </section>
 
       {/* Features Grid */}
       <section className="home-section">
@@ -112,10 +128,10 @@ export default function HomePage() {
       </section>
 
       {/* Step-by-Step Guide */}
-      <section className="home-section" id="guide">
-        <div className="section-label">Getting Started</div>
-        <h2 className="section-title">How to Analyze a Repository</h2>
-        <p className="section-subtitle">Connect your repo in under 5 minutes. No cloud setup required.</p>
+      <section className="home-section" id="guide" ref={guideRef}>
+        <div className="section-label">Operational Workflow</div>
+        <h2 className="section-title">How DevMind Operates</h2>
+        <p className="section-subtitle">A seamless pipeline from local ingestion to intelligent insights.</p>
 
         <div className="steps-list">
           {steps.map((step) => (

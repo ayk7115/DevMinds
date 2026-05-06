@@ -40,6 +40,7 @@ const historyRowToInsight = (row) => {
     engineer_changelog: rawOutput.changelog || `PR: ${row.title}\nAuthor: ${row.author}\nRepo: ${row.repo_name}\nArchitectural Impact: ${row.architectural_impact}\nSecurity Risks: ${row.security_risks}`,
     architecturalImpact: row.architectural_impact,
     securityRisks: row.security_risks,
+    readinessScoreBreakdown: rawOutput.breakdown || [],
     rawOutput: rawOutput.raw || row.raw_output || row.summary
   };
 };
@@ -51,6 +52,7 @@ function DashboardPage() {
   const [insights, setInsights] = useState(() => persistedSession.insights || null);
   const [activeTab, setActiveTab] = useState(() => persistedSession.activeTab || 'changelog');
   const [isChatOpen, setIsChatOpen] = useState(() => persistedSession.isChatOpen || false);
+  const [currentRepo, setCurrentRepo] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -59,9 +61,10 @@ function DashboardPage() {
       insights,
       activeTab,
       isChatOpen,
+      currentRepo,
       savedAt: new Date().toISOString()
     }));
-  }, [logs, insights, activeTab, isChatOpen]);
+  }, [logs, insights, activeTab, isChatOpen, currentRepo]);
 
   useEffect(() => {
     if (insights) return;
@@ -71,6 +74,7 @@ function DashboardPage() {
       .then(rows => {
         if (Array.isArray(rows) && rows.length > 0) {
           setInsights(historyRowToInsight(rows[0]));
+          if (!currentRepo) setCurrentRepo(rows[0].repo_name);
         }
       })
       .catch(() => {});
@@ -101,6 +105,7 @@ function DashboardPage() {
     socket.on('agent:complete', (data) => {
       setLogs(prev => [...prev, { type: 'status', text: `>> Analysis Complete for PR #${data.prId}` }]);
       setInsights(data.insights);
+      if (data.insights.repo_name) setCurrentRepo(data.insights.repo_name);
     });
 
     socket.on('agent:error', (data) => {
@@ -135,6 +140,11 @@ function DashboardPage() {
             <Activity size={28} color="var(--accent-primary)" />
             DevMind Strategic Dashboard
           </div>
+          {currentRepo && (
+            <div className="repo-badge" style={{ background: 'rgba(76,201,240,0.1)', color: 'var(--accent-primary)', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600, border: '1px solid rgba(76,201,240,0.2)' }}>
+              Active Repo: {currentRepo}
+            </div>
+          )}
         </div>
 
         <div className="nav-tabs">
@@ -175,12 +185,12 @@ function DashboardPage() {
           )}
           {activeTab === 'architecture' && (
             <main className="architecture-grid">
-              <ArchitectureMapper />
+              <ArchitectureMapper onRepoChange={setCurrentRepo} />
             </main>
           )}
           {activeTab === 'history' && (
             <main className="architecture-grid">
-              <PRTimeline onSelectInsight={setInsights} />
+              <PRTimeline onSelectInsight={setInsights} filterRepo={currentRepo} />
             </main>
           )}
         </div>

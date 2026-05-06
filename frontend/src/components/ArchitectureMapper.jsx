@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { FolderGit2, Loader, Package, Code, Search, GitBranch, AlertCircle, Maximize, Minimize } from 'lucide-react';
+import { FolderGit2, Loader, Package, Code, Search, GitBranch, AlertCircle, Maximize, Minimize, Server, BarChart3 } from 'lucide-react';
 import { ReactFlow, Controls, Background, applyNodeChanges, applyEdgeChanges, MarkerType } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from '@dagrejs/dagre';
@@ -28,7 +28,7 @@ const getLayoutedElements = (nodes, edges) => {
   };
 };
 
-export default function ArchitectureMapper() {
+export default function ArchitectureMapper({ onRepoChange }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
@@ -38,6 +38,8 @@ export default function ArchitectureMapper() {
   const [error, setError] = useState('');
   const [repoName, setRepoName] = useState('DevMinds Project');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeTab, setActiveTab] = useState('map'); // 'map', 'stack', 'files', 'api'
+
   const applyLayout = (rawNodes, rawEdges) => {
     const { nodes: ln, edges: le } = getLayoutedElements(rawNodes, rawEdges);
     setNodes(ln);
@@ -52,6 +54,7 @@ export default function ArchitectureMapper() {
         setData(json);
         applyLayout(json.flowNodes || [], json.flowEdges || []);
         setLoading(false);
+        if (json.repoName) onRepoChange?.(json.repoName);
       })
       .catch(() => setLoading(false));
   }, []);
@@ -74,7 +77,9 @@ export default function ArchitectureMapper() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Analysis failed');
       setData(json);
-      setRepoName(json.repoName || repoUrl.split('/').slice(-1)[0]);
+      const name = json.repoName || repoUrl.split('/').slice(-1)[0];
+      setRepoName(name);
+      onRepoChange?.(name);
       applyLayout(json.flowNodes || [], json.flowEdges || []);
     } catch (err) {
       setError(err.message);
@@ -85,6 +90,20 @@ export default function ArchitectureMapper() {
 
   const onNodesChange = useCallback((changes) => setNodes(nds => applyNodeChanges(changes, nds)), []);
   const onEdgesChange = useCallback((changes) => setEdges(eds => applyEdgeChanges(changes, eds)), []);
+  
+  const metrics = data?.metrics || {};
+  const languageEntries = Object.entries(data?.languageStats || {}).sort((a, b) => b[1] - a[1]);
+  const endpoints = data?.apiEndpoints || [];
+  const risks = data?.risks || [];
+  const dependencies = data?.dependencies || {};
+  const moduleGroups = data?.moduleGroups || {};
+
+  const tabs = [
+    { id: 'map', icon: <FolderGit2 size={16} />, label: 'Architecture Map' },
+    { id: 'stack', icon: <Package size={16} />, label: 'Tech Stack' },
+    { id: 'files', icon: <Code size={16} />, label: 'File Explanation' },
+    { id: 'api', icon: <Server size={16} />, label: 'API Surface' },
+  ];
 
   return (
     <div 
@@ -103,14 +122,34 @@ export default function ArchitectureMapper() {
         } : {})
       }}
     >
-      <div className="panel-header" style={{ justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <FolderGit2 size={22} />
-          Repo X-Ray · <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{repoName}</span>
+      <div className="panel-header" style={{ justifyContent: 'space-between', padding: '1rem 1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <FolderGit2 size={22} color="var(--accent-primary)" />
+            <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>Repo X-Ray</span>
+          </div>
+          
+          <div className="inner-tabs" style={{ display: 'flex', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.25rem', borderRadius: '10px' }}>
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  padding: '0.4rem 1rem', borderRadius: '8px', border: 'none',
+                  background: activeTab === tab.id ? 'rgba(76,201,240,0.15)' : 'transparent',
+                  color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  cursor: 'pointer', fontSize: '0.85rem', fontWeight: activeTab === tab.id ? 600 : 400,
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Remote Repo Input */}
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1, maxWidth: '500px', marginLeft: '2rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: 1, maxWidth: '450px', marginLeft: '2rem' }}>
           <div style={{ flex: 1, position: 'relative' }}>
             <GitBranch size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
@@ -120,80 +159,248 @@ export default function ArchitectureMapper() {
               onChange={e => setRepoUrl(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && analyzeRepo()}
               disabled={analyzing}
+              style={{ paddingLeft: '2.25rem', height: '38px' }}
             />
           </div>
-          <button className="btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', whiteSpace: 'nowrap' }} onClick={analyzeRepo} disabled={analyzing || !repoUrl}>
+          <button className="btn-primary" style={{ padding: '0 1.25rem', height: '38px', fontSize: '0.85rem' }} onClick={analyzeRepo} disabled={analyzing || !repoUrl}>
             {analyzing ? <Loader size={14} className="spin" /> : <Search size={14} />}
-            {analyzing ? ' Analyzing...' : ' Analyze'}
+            {analyzing ? ' Thinking...' : ' Analyze'}
           </button>
           <button 
             className="btn-ghost-small" 
             onClick={() => setIsFullscreen(!isFullscreen)}
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Mode"}
+            style={{ height: '38px', width: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+            {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
           </button>
         </div>
       </div>
 
       {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'rgba(239,68,68,0.1)', borderRadius: '8px', color: 'var(--error)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+        <div style={{ margin: '1rem 1.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: 'rgba(239,68,68,0.1)', borderRadius: '8px', color: 'var(--error)', fontSize: '0.9rem' }}>
           <AlertCircle size={16} /> {error}
         </div>
       )}
 
       {(loading || analyzing) ? (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-          <Loader size={48} style={{ color: 'var(--accent-primary)', animation: 'spin 1.5s linear infinite' }} />
-          <h3 style={{ color: 'var(--text-secondary)' }}>
-            {analyzing ? `Cloning & Analyzing Repository...` : 'Scanning Architecture...'}
-          </h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            {analyzing ? 'This may take 30–60 seconds for larger repos.' : ''}
-          </p>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
+          <div className="scanner-animation">
+             <Loader size={48} className="spin" style={{ color: 'var(--accent-primary)' }} />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <h3 style={{ color: 'white', marginBottom: '0.5rem' }}>
+              {analyzing ? `Deep Scanning Repository...` : 'Mapping Architecture...'}
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              {analyzing ? `Analyzing ${repoName} patterns and dependencies.` : 'Parsing project structure and logical flows.'}
+            </p>
+          </div>
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', overflow: 'hidden' }}>
-          {/* Stats Row */}
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <div className="detail-section" style={{ flex: 1 }}>
-              <div className="detail-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Package size={14} /> Dependencies ({Object.keys(data?.dependencies || {}).length})
-              </div>
-              <div className="deps-list" style={{ marginTop: '0.5rem' }}>
-                {Object.keys(data?.dependencies || {}).slice(0, 15).map(dep => (
-                  <span key={dep} className="dep-badge">{dep}</span>
-                ))}
-              </div>
-            </div>
-            <div className="detail-section" style={{ minWidth: '200px' }}>
-              <div className="detail-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Code size={14} /> Entry Points
-              </div>
-              <ul style={{ marginTop: '0.5rem', paddingLeft: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                {data?.coreFiles?.map((f, i) => <li key={i}>{f}</li>)}
-              </ul>
-            </div>
-          </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '1.5rem' }}>
+          
+          {/* Active View */}
+          <div style={{ flex: 1, display: 'flex', gap: '1.5rem', minHeight: 0 }}>
+            
+            {/* Main Content Area */}
+            <div style={{ flex: 1, background: 'rgba(0,0,0,0.25)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              
+              {activeTab === 'map' && (
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    onNodesChange={onNodesChange}
+                    onEdgesChange={onEdgesChange}
+                    defaultEdgeOptions={{
+                      animated: true,
+                      style: { stroke: 'rgba(76,201,240,0.5)', strokeWidth: 2 },
+                      markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(76,201,240,0.5)' }
+                    }}
+                    fitView
+                    colorMode="dark"
+                  >
+                    <Background color="rgba(255,255,255,0.03)" gap={20} />
+                    <Controls style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  </ReactFlow>
+                  <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', background: 'rgba(0,0,0,0.5)', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    Logical Flow Graph · Interactive
+                  </div>
+                </div>
+              )}
 
-          {/* React Flow Graph */}
-          <div style={{ flex: 1, background: 'rgba(0,0,0,0.4)', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              defaultEdgeOptions={{
-                animated: true,
-                style: { stroke: 'rgba(76,201,240,0.4)', strokeWidth: 1.5 },
-                markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(76,201,240,0.4)' }
-              }}
-              fitView
-              colorMode="dark"
-            >
-              <Background color="rgba(255,255,255,0.03)" gap={20} />
-              <Controls style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)' }} />
-            </ReactFlow>
+              {activeTab === 'stack' && (
+                <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                    <section>
+                      <h4 style={{ color: 'var(--accent-primary)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Code size={18} /> Languages & Frameworks
+                      </h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                        {languageEntries.map(([lang, count]) => (
+                          <div key={lang} className="glass-panel" style={{ padding: '1rem 1.5rem', minWidth: '120px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>{lang}</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>{count} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-muted)' }}>files</span></div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section>
+                      <h4 style={{ color: 'var(--accent-secondary)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Package size={18} /> Core Dependencies
+                      </h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {Object.keys(dependencies).slice(0, 40).map(dep => (
+                          <span key={dep} className="dep-badge" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>{dep}</span>
+                        ))}
+                        {Object.keys(dependencies).length > 40 && (
+                          <span className="dep-badge" style={{ opacity: 0.6 }}>+ {Object.keys(dependencies).length - 40} more</span>
+                        )}
+                      </div>
+                    </section>
+
+                    <section style={{ gridColumn: '1 / -1' }}>
+                      <h4 style={{ color: 'var(--success)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Server size={18} /> System Integrations
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                        {Object.entries(data?.integrations || {}).map(([key, enabled]) => (
+                          <div key={key} style={{ padding: '1rem', borderRadius: '12px', background: enabled ? 'rgba(34,197,94,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${enabled ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ textTransform: 'capitalize', color: enabled ? 'white' : 'var(--text-muted)' }}>{key}</span>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: enabled ? 'var(--success)' : 'rgba(255,255,255,0.1)' }}></div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'files' && (
+                <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+                  <h4 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem' }}>Project Directory Structure</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                    <div className="glass-panel" style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.4)', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                      {data?.structure?.map((line, i) => (
+                        <div key={i} style={{ whiteSpace: 'pre', color: line.includes('/') ? 'var(--accent-secondary)' : 'var(--text-secondary)' }}>
+                          {line}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <h5 style={{ color: 'white', marginBottom: '0.5rem' }}>Structural Overview</h5>
+                      <div className="detail-section">
+                        <div className="detail-title">Entry Points</div>
+                        <div className="detail-text" style={{ fontSize: '0.85rem' }}>
+                          {data?.entryPoints?.map(p => <div key={p} style={{ color: 'var(--accent-primary)' }}>{p}</div>) || 'None detected'}
+                        </div>
+                      </div>
+                      <div className="detail-section">
+                        <div className="detail-title">Module Distribution</div>
+                        <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          <li><strong>Frontend:</strong> {moduleGroups.frontend?.length || 0} source files</li>
+                          <li><strong>Backend:</strong> {moduleGroups.backend?.length || 0} source files</li>
+                          <li><strong>Services:</strong> {moduleGroups.services?.length || 0} logic modules</li>
+                          <li><strong>Components:</strong> {moduleGroups.components?.length || 0} UI elements</li>
+                        </ul>
+                      </div>
+                      <div className="detail-section" style={{ borderLeftColor: 'var(--accent-secondary)' }}>
+                        <div className="detail-title">Configuration</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
+                          {data?.configFiles?.map(f => <span key={f} className="dep-badge" style={{ fontSize: '0.75rem', borderColor: 'rgba(255,255,255,0.1)' }}>{f}</span>)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'api' && (
+                <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+                  <h4 style={{ color: 'var(--accent-secondary)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Server size={18} /> REST API Surface Area
+                  </h4>
+                  {endpoints.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
+                      No Express/API endpoints detected in this repository.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.75rem' }}>
+                      {endpoints.map((endpoint, index) => (
+                        <div key={index} className="xray-row" style={{ padding: '0.75rem 1.25rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <span className={`xray-method method-${endpoint.method.toLowerCase()}`} style={{ minWidth: '70px', textAlign: 'center', fontWeight: 800 }}>
+                            {endpoint.method}
+                          </span>
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.95rem', color: 'white', flex: 1 }}>{endpoint.path}</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{endpoint.file}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+
+            {/* Side Stats Bar */}
+            <div style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                  Quick Metrics
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>{metrics.files}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Files</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>{metrics.apiEndpoints}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>APIs</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>{metrics.dependencies}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Libs</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>{metrics.databaseTables}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Tables</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="detail-section" style={{ borderLeftColor: risks.length ? 'var(--warning)' : 'var(--success)', background: 'rgba(255,255,255,0.02)' }}>
+                <div className="detail-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertCircle size={14} /> Structural Gaps
+                </div>
+                {risks.length === 0 ? (
+                  <div className="detail-text" style={{ fontSize: '0.85rem' }}>No major structural gaps detected.</div>
+                ) : (
+                  <ul className="xray-list" style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {risks.map((risk, index) => (
+                      <li key={index} style={{ color: 'var(--warning)', fontSize: '0.8rem', display: 'flex', gap: '0.5rem' }}>
+                        <span>•</span> {risk}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="glass-panel" style={{ padding: '1.25rem', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+                  Largest Modules
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {data?.largestFiles?.slice(0, 8).map((file, idx) => (
+                    <div key={idx} style={{ fontSize: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '0.5rem' }}>
+                      <div style={{ color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.path.split('/').pop()}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{(file.size / 1024).toFixed(1)} KB</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       )}
