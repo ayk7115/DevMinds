@@ -83,7 +83,7 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="hero">
-        <div className="hero-badge">Sovereign AI Platform · Powered by Llama-3 + Groq</div>
+        <div className="hero-badge">Sovereign AI Platform | Powered by Llama-3 + Groq</div>
         <h1 className="hero-title">
           Turn Every PR Into<br />
           <span className="gradient-text">Strategic Intelligence</span>
@@ -173,7 +173,7 @@ export default function HomePage() {
           <Activity size={20} color="var(--accent-primary)" />
           <span>DevMind</span>
         </div>
-        <p>Sovereign AI · Local-first · Zero cloud exposure</p>
+        <p>Sovereign AI | Local-first | Zero cloud exposure</p>
       </footer>
     </div>
   );

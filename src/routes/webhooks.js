@@ -4,9 +4,7 @@ import { processPullRequest } from '../services/agentService.js';
 
 const router = express.Router();
 
-// A placeholder for your GitHub Webhook Secret
-// In production, this MUST come from environment variables (e.g., process.env.GITHUB_WEBHOOK_SECRET)
-const GITHUB_SECRET = process.env.GITHUB_WEBHOOK_SECRET || 'devmind_secret_placeholder';
+const getGitHubSecret = () => process.env.GITHUB_WEBHOOK_SECRET?.trim();
 
 /**
  * Middleware to verify GitHub Webhook Signatures
@@ -14,6 +12,12 @@ const GITHUB_SECRET = process.env.GITHUB_WEBHOOK_SECRET || 'devmind_secret_place
  */
 const verifyGitHubSignature = (req, res, next) => {
     const signature = req.headers['x-hub-signature-256'];
+    const secret = getGitHubSecret();
+
+    if (!secret) {
+        console.error('[Webhook] GITHUB_WEBHOOK_SECRET is not configured. Refusing webhook processing.');
+        return res.status(503).send('Webhook secret not configured');
+    }
     
     if (!signature) {
         console.warn('[Webhook] Missing signature in request headers.');
@@ -26,10 +30,12 @@ const verifyGitHubSignature = (req, res, next) => {
     }
 
     try {
-        const hmac = crypto.createHmac('sha256', GITHUB_SECRET);
+        const hmac = crypto.createHmac('sha256', secret);
         const digest = 'sha256=' + hmac.update(req.rawBody).digest('hex');
-        
-        if (crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest))) {
+        const signatureBuffer = Buffer.from(signature);
+        const digestBuffer = Buffer.from(digest);
+
+        if (signatureBuffer.length === digestBuffer.length && crypto.timingSafeEqual(signatureBuffer, digestBuffer)) {
             return next();
         } else {
             console.warn('[Webhook] Signature mismatch.');

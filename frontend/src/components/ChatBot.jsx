@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader } from 'lucide-react';
+import { API_BASE_URL, apiUrl } from '../services/api';
 
 const CHAT_SESSION_KEY = 'devmind.chat.session.v1';
 
@@ -25,7 +26,7 @@ export default function ChatBot() {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/chat/status')
+    fetch(apiUrl('/api/chat/status'))
       .then(res => res.json())
       .then(setStatus)
       .catch(() => setStatus({ configured: false, model: 'unavailable' }));
@@ -48,7 +49,7 @@ export default function ChatBot() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:3000/api/chat', {
+      const res = await fetch(apiUrl('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text })
@@ -62,7 +63,7 @@ export default function ChatBot() {
         setStatus(prev => ({ ...(prev || {}), configured: data.code !== 'GROQ_NOT_CONFIGURED', lastError: data.error }));
       }
     } catch {
-      const errorText = 'Could not reach the chat service. Make sure the backend is running on http://localhost:3000.';
+      const errorText = `Could not reach the chat service. Make sure the backend is running on ${API_BASE_URL}.`;
       setStatus(prev => ({ ...(prev || {}), configured: false, lastError: errorText }));
       setMessages(prev => [...prev, { role: 'assistant', text: errorText }]);
     } finally {

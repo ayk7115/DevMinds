@@ -1,6 +1,8 @@
 import express from 'express';
+import fs from 'fs';
 import { getChatStatus } from '../services/chatService.js';
 import { getTelegramStatus, sendTelegramTestMessage } from '../services/telegramService.js';
+import { runtimeConfig } from '../config/runtimeConfig.js';
 
 const router = express.Router();
 
@@ -15,6 +17,15 @@ router.get('/status', (req, res) => {
         ollama: {
             baseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
             embedModel: process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text'
+        },
+        localAi: {
+            openclawPath: runtimeConfig.openclawPath,
+            openclawExists: (runtimeConfig.openclawPath.startsWith('/') || runtimeConfig.openclawPath.startsWith('~')) 
+                ? true // Assume true for remote/WSL paths to avoid blocking the UI, or we could use wsl test -f
+                : fs.existsSync(runtimeConfig.openclawPath),
+            model: runtimeConfig.localModel,
+            runtimeDir: runtimeConfig.runtimeDir,
+            databasePath: runtimeConfig.databasePath
         }
     });
 });

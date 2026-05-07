@@ -18,6 +18,9 @@ router.post('/', async (req, res) => {
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
         return res.status(400).json({ error: 'Message is required.' });
     }
+    if (message.length > 2000) {
+        return res.status(413).json({ error: 'Message is too long. Please keep chat requests under 2,000 characters.' });
+    }
 
     try {
         const reply = await chat(message.trim());

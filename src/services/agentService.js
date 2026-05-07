@@ -8,11 +8,50 @@ import { chunkDiffForLlm } from './enterprise/smartDiffChunker.js';
 import { scanDiffChunks } from './enterprise/sastScanner.js';
 import { rememberPrInsight, searchSimilarPrs } from './enterprise/hybridContextMemory.js';
 import { extractJiraKey, updateJiraFromInsight } from './enterprise/gerritJiraAdapters.js';
+import { createRuntimeRunDir, runtimeConfig } from '../config/runtimeConfig.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIFF_FETCH_ATTEMPTS = Number(process.env.DEVMIND_DIFF_FETCH_ATTEMPTS || 3);
+const isWindowsHost = process.platform === 'win32';
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const createRunId = (prData) => `pr-${prData.id}-${Date.now()}`;
+
+const createAnalysisRun = (runId, prData) => {
+    db.prepare(`
+        INSERT OR REPLACE INTO analysis_runs
+            (id, source_type, repo_name, external_id, title, status, current_stage)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+        runId,
+        prData.sourceType || 'github_pr',
+        prData.repo,
+        prData.id?.toString(),
+        prData.title,
+        'running',
+        'initializing'
+    );
+};
+
+const updateAnalysisRun = (runId, { status = 'running', stage, error = null, insightId = null } = {}) => {
+    db.prepare(`
+        UPDATE analysis_runs
+        SET status = ?,
+            current_stage = COALESCE(?, current_stage),
+            error = ?,
+            insight_id = COALESCE(?, insight_id),
+            completed_at = CASE WHEN ? IN ('complete', 'failed') THEN CURRENT_TIMESTAMP ELSE completed_at END
+        WHERE id = ?
+    `).run(status, stage, error, insightId, status, runId);
+};
+
+const appendRunLog = (runId, level, message) => {
+    db.prepare(`
+        INSERT INTO analysis_run_logs (run_id, level, message)
+        VALUES (?, ?, ?)
+    `).run(runId, level, message);
+};
 
 const fetchWithRetries = async (url, options = {}, attempts = DIFF_FETCH_ATTEMPTS) => {
     let lastError;
@@ -37,6 +76,7 @@ const fetchWithRetries = async (url, options = {}, attempts = DIFF_FETCH_ATTEMPT
  * e.g., C:\Users\name -> /mnt/c/Users/name
  */
 const toWslPath = (winPath) => {
+    if (winPath.startsWith('/') || winPath.startsWith('~')) return winPath;
     const absolutePath = path.resolve(winPath).replace(/\\/g, '/');
     const driveMatch = absolutePath.match(/^([a-zA-Z]):/);
     if (driveMatch) {
@@ -48,21 +88,24 @@ const toWslPath = (winPath) => {
 
 /**
  * Agent Service (Phase 2)
- * Orchestrates the execution of OpenClaw on Ubuntu via WSL.
+ * Orchestrates OpenClaw through the configured local project binary.
  */
 export const processPullRequest = async (prData, io) => {
+    const runId = prData.runId || createRunId(prData);
     console.log(`[AgentService] Initializing OpenClaw execution for PR: ${prData.title}`);
+    createAnalysisRun(runId, prData);
+    appendRunLog(runId, 'info', 'Analysis run initialized.');
 
     // Read prompt files directly
     const soulPath = path.join(__dirname, '../agent/SOUL.md');
     const skillPath = path.join(__dirname, '../agent/SKILL.md');
     const memoryPath = path.join(__dirname, '../agent/MEMORY.md');
     
-    // Auto Handover Docs: Inject fresh architecture into MEMORY.md
+    let repoData = { vulnerabilities: [], summary: '' };
     try {
         const { analyzeRepository } = await import('./repoAnalyzer.js');
         const rootPath = path.resolve();
-        const repoData = analyzeRepository(rootPath);
+        repoData = analyzeRepository(rootPath);
         const memoryContent = `This file contains persistent project context generated dynamically by the Repo X-Ray.\n\n${repoData.summary}`;
         fs.writeFileSync(memoryPath, memoryContent);
     } catch (err) {
@@ -76,6 +119,7 @@ export const processPullRequest = async (prData, io) => {
     // Emit event to frontend
     if (io) {
         io.emit('agent:status', {
+            runId,
             status: 'initializing',
             message: 'Waking up the Strategic Twin on Ubuntu...',
             prId: prData.id
@@ -88,6 +132,8 @@ export const processPullRequest = async (prData, io) => {
     let sastFindings = [];
     let similarPrs = [];
     try {
+        updateAnalysisRun(runId, { stage: 'fetching_diff' });
+        appendRunLog(runId, 'info', 'Fetching PR diff.');
         console.log(`[AgentService] Fetching raw diff securely using GITHUB_PAT`);
         const fetchOptions = process.env.GITHUB_PAT ? {
             headers: {
@@ -104,9 +150,12 @@ export const processPullRequest = async (prData, io) => {
         }
     } catch (fetchError) {
         console.error('[AgentService] Network error fetching diff:', fetchError);
+        appendRunLog(runId, 'warn', `Diff fetch failed: ${fetchError.message}`);
     }
 
     try {
+        updateAnalysisRun(runId, { stage: 'chunking_diff' });
+        appendRunLog(runId, 'info', 'Chunking diff and scanning prioritized context.');
         const chunks = await chunkDiffForLlm(diffContent, {
             repoRoot: path.resolve(),
             maxChars: Number(process.env.DEVMIND_CHUNK_CHARS || 4600)
@@ -145,10 +194,12 @@ export const processPullRequest = async (prData, io) => {
         }
     } catch (chunkError) {
         console.error('[AgentService] Smart chunking failed, falling back to truncated raw diff:', chunkError);
+        appendRunLog(runId, 'warn', `Smart chunking fallback used: ${chunkError.message}`);
         prioritizedDiffContext = diffContent.slice(0, 10000) + (diffContent.length > 10000 ? '\n...[TRUNCATED]' : '');
     }
 
     try {
+        updateAnalysisRun(runId, { stage: 'searching_memory' });
         similarPrs = await searchSimilarPrs({
             query: `${prData.title}\n${prioritizedDiffContext.slice(0, 4000)}`,
             repoName: prData.repo,
@@ -156,41 +207,74 @@ export const processPullRequest = async (prData, io) => {
         });
     } catch (memoryError) {
         console.warn('[AgentService] Hybrid memory search skipped:', memoryError.message);
+        appendRunLog(runId, 'warn', `Hybrid memory search skipped: ${memoryError.message}`);
     }
 
     return new Promise((resolve, reject) => {
-        const nodePath = '/home/aadi/.nvm/versions/node/v22.22.2/bin/node';
-        const openclawPath = '/home/aadi/.nvm/versions/node/v22.22.2/bin/openclaw';
+        const openclawPath = runtimeConfig.openclawPath;
+        const localModel = runtimeConfig.localModel;
         
         // Construct the full prompt context with RAW TEXT, not a URL
         const securityContext = sastFindings.length > 0
             ? sastFindings.map(f => `- ${f.severity.toUpperCase()} ${f.ruleId} in ${f.filePath}:${f.line}: ${f.message}`).join('\n')
             : 'No lightweight SAST findings detected in prioritized chunks.';
 
+        const repoVulnerabilities = repoData.vulnerabilities && repoData.vulnerabilities.length > 0
+            ? repoData.vulnerabilities.map(v => `- [${v.severity.toUpperCase()}] ${v.message} in ${v.filePath}`).join('\n')
+            : 'No repository-wide vulnerabilities detected by Repo X-Ray.';
+
         const recurrenceContext = similarPrs.length > 0
             ? similarPrs.map(item => `- ${item.title} (${Math.round(item.similarity * 100)}% similar): ${item.summary}`).join('\n')
             : 'No similar historical PR pattern was found in local vector memory.';
 
-        const fullPrompt = `${soulContent}\n\n${skillContent}\n\n${memoryContent}\n\nAnalyze these prioritized PR diff chunks and output a readinessScore, readinessScoreBreakdown, stakeholder_summary, engineer_changelog, architecturalImpact, and securityRisks in JSON format.\nPR Title: ${prData.title}\n\nLightweight SAST Signals:\n${securityContext}\n\nRecurring Historical Patterns:\n${recurrenceContext}\n\nPrioritized Diff Context:\n${prioritizedDiffContext}`;
+        const fullPrompt = `${soulContent}\n\n${skillContent}\n\n${memoryContent}\n\n### STRATEGIC TASK\nAnalyze these prioritized PR diff chunks against the existing project architecture. 
+DO NOT hallucinate files or structures that are not in the MEMORY.md.
+Output a valid JSON object with: readinessScore, readinessScoreBreakdown (array of {category, score, rationale}), stakeholder_summary, engineer_changelog, architecturalImpact, and securityRisks.
 
-        // To prevent Windows WSL from treating newlines as separate commands,
-        // we write the prompt and a runner script to disk, then execute the script.
-        const promptFilePath = path.join(__dirname, '../agent/temp_prompt.txt');
-        const scriptFilePath = path.join(__dirname, '../agent/temp_runner.sh');
+PR Title: ${prData.title}
+
+### DETECTED REPO VULNERABILITIES (FOR CONTEXT)
+${repoVulnerabilities}
+
+### LIGHTWEIGHT SAST SIGNALS (FROM DIFF)
+${securityContext}
+
+### RECURRING HISTORICAL PATTERNS
+${recurrenceContext}
+
+### PRIORITIZED DIFF CONTEXT
+${prioritizedDiffContext}`;
+
+        const runDir = createRuntimeRunDir(`pr-${prData.id}`);
+        const promptFilePath = path.join(runDir, 'prompt.txt');
+        const scriptFilePath = path.join(runDir, 'runner.sh');
         
-        fs.writeFileSync(promptFilePath, fullPrompt);
+        fs.writeFileSync(promptFilePath, fullPrompt, { mode: 0o600 });
         
         const bashScript = `#!/bin/bash
-PROMPT=$(cat "${toWslPath(promptFilePath)}")
-"${nodePath}" "${openclawPath}" infer model run --local --model ollama/llama3 --prompt "$PROMPT"
+set -euo pipefail
+PROMPT=$(cat "${isWindowsHost ? toWslPath(promptFilePath) : promptFilePath}")
+export GROQ_API_KEY="${process.env.GROQ_API_KEY || ''}"
+"${isWindowsHost ? toWslPath(openclawPath) : openclawPath}" infer model run --local --model "${localModel}" --prompt "$PROMPT"
 `;
-        fs.writeFileSync(scriptFilePath, bashScript);
+        fs.writeFileSync(scriptFilePath, bashScript, { mode: 0o700 });
 
-        const args = ['bash', toWslPath(scriptFilePath)];
+        const args = isWindowsHost ? ['bash', toWslPath(scriptFilePath)] : [scriptFilePath];
+        const command = isWindowsHost ? 'wsl' : 'bash';
+        
+        // Support isolated runner user if configured
+        if (isWindowsHost && process.env.DEVMIND_WSL_USER) {
+            args.unshift('-u', process.env.DEVMIND_WSL_USER);
+        }
 
-        console.log(`[AgentService] Spawning WSL process: wsl ${args.join(' ')}`);
+        console.log(`[AgentService] Spawning OpenClaw process: ${command} ${args.join(' ')}`);
+        updateAnalysisRun(runId, { stage: 'running_local_model' });
+        appendRunLog(runId, 'info', `OpenClaw started with model ${localModel}.`);
 
-        const child = spawn('wsl', args);
+        const child = spawn(command, args, {
+            cwd: runtimeConfig.projectRoot,
+            env: process.env
+        });
 
         let fullOutput = '';
 
@@ -202,6 +286,7 @@ PROMPT=$(cat "${toWslPath(promptFilePath)}")
             // Stream token-by-token to the frontend for a "typing" effect
             if (io) {
                 io.emit('agent:stream', {
+                    runId,
                     prId: prData.id,
                     chunk: chunk
                 });
@@ -216,10 +301,13 @@ PROMPT=$(cat "${toWslPath(promptFilePath)}")
             console.log(`[AgentService] OpenClaw process exited with code ${code}`);
 
             if (code !== 0) {
-                if (io) io.emit('agent:error', { message: 'OpenClaw execution failed.', prId: prData.id });
+                updateAnalysisRun(runId, { status: 'failed', stage: 'local_model_failed', error: `OpenClaw exited with code ${code}` });
+                appendRunLog(runId, 'error', `OpenClaw exited with code ${code}.`);
+                if (io) io.emit('agent:error', { runId, message: 'OpenClaw execution failed.', prId: prData.id });
                 return reject(new Error(`OpenClaw exited with code ${code}`));
             }
 
+            updateAnalysisRun(runId, { stage: 'parsing_model_output' });
             // Extract JSON from OpenClaw output
             let insight;
             try {
@@ -267,6 +355,9 @@ PROMPT=$(cat "${toWslPath(promptFilePath)}")
                     persistedRawOutput
                 );
                 insight.id = saved.lastInsertRowid;
+                insight.runId = runId;
+                updateAnalysisRun(runId, { status: 'complete', stage: 'complete', insightId: saved.lastInsertRowid });
+                appendRunLog(runId, 'info', 'Insight persisted and run completed.');
                 console.log('[Database] Insight persisted for PR:', prData.id);
 
                 const ticketKey = prData.ticketKey || extractJiraKey(prData.title, prData.body);
@@ -303,6 +394,7 @@ PROMPT=$(cat "${toWslPath(promptFilePath)}")
             // Emit final completion event
             if (io) {
                 io.emit('agent:complete', {
+                    runId,
                     status: 'complete',
                     prId: prData.id,
                     insights: insight
@@ -313,7 +405,9 @@ PROMPT=$(cat "${toWslPath(promptFilePath)}")
         });
 
         child.on('error', (err) => {
-            console.error('[AgentService] Failed to start WSL process:', err);
+            console.error('[AgentService] Failed to start OpenClaw process:', err);
+            updateAnalysisRun(runId, { status: 'failed', stage: 'spawn_failed', error: err.message });
+            appendRunLog(runId, 'error', `Failed to start OpenClaw: ${err.message}`);
             reject(err);
         });
     });

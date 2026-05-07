@@ -1,9 +1,9 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { ensureDirectory, runtimeConfig } from './runtimeConfig.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '../../devmind.db');
+const dbPath = runtimeConfig.databasePath;
+ensureDirectory(path.dirname(dbPath));
 
 // Initialize SQLite database
 const verbose = process.env.SQLITE_VERBOSE === 'true' ? console.log : null;
@@ -27,6 +27,29 @@ db.exec(`
 `);
 
 db.exec(`
+    CREATE TABLE IF NOT EXISTS analysis_runs (
+        id TEXT PRIMARY KEY,
+        source_type TEXT NOT NULL,
+        repo_name TEXT,
+        external_id TEXT,
+        title TEXT,
+        status TEXT NOT NULL,
+        current_stage TEXT,
+        error TEXT,
+        insight_id INTEGER,
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME
+    );
+
+    CREATE TABLE IF NOT EXISTS analysis_run_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL,
+        level TEXT NOT NULL,
+        message TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(run_id) REFERENCES analysis_runs(id)
+    );
+
     CREATE TABLE IF NOT EXISTS integration_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         source TEXT NOT NULL,
@@ -117,6 +140,6 @@ db.exec(`
     );
 `);
 
-console.log('[Database] SQLite initialized and schema verified.');
+console.log(`[Database] SQLite initialized and schema verified at ${dbPath}.`);
 
 export default db;

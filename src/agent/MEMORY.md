@@ -1,84 +1,12 @@
 This file contains persistent project context generated dynamically by the Repo X-Ray.
 
-# Repository Architecture Overview
-- **Core Technology Stack**: better-sqlite3, cors, dotenv, express, groq-sdk, helmet, node-cron, simple-git, socket.io, tree-sitter...
-- **Entry Points**: package.json (Dependencies), App.jsx (Entry Point), main.jsx (Entry Point), package.json (Dependencies), index.js (Entry Point)
-- **Project Structure**:
-📄 .env
-📄 .env.example
-📄 .gitignore
-📄 backend_err.log
-📄 backend_out.log
-📄 devmind.db
-📄 DevMinds_MS Ramaiah Institute of Technology.pdf
-📁 docs/
-  📄 enterprise-features-scaffold.md
-📁 frontend/
-  📄 .gitignore
-  📄 eslint.config.js
-  📄 index.html
-  📄 package.json
-  📁 public/
-    📄 favicon.svg
-    📄 icons.svg
-  📄 README.md
-  📁 src/
-    📄 App.css
-    📄 App.jsx
-    📁 assets/
-      📄 hero.png
-      📄 react.svg
-      📄 vite.svg
-    📁 components/
-      📄 ArchitectureMapper.jsx
-      📄 AskAgentWalkthrough.jsx
-      📄 ChatBot.jsx
-      📄 InsightCard.jsx
-      📄 LiveTerminal.jsx
-      📄 PRTimeline.jsx
-    📄 index.css
-    📄 main.jsx
-    📁 pages/
-      📄 DashboardPage.jsx
-      📄 HomePage.jsx
-    📁 services/
-      📄 socket.js
-  📄 vite.config.js
-📄 package.json
-📄 scratch_pdf_content.txt
-📁 src/
-  📁 agent/
-    📄 MEMORY.md
-    📄 SKILL.md
-    📄 SOUL.md
-    📄 temp_prompt.txt
-    📄 temp_runner.sh
-  📁 config/
-    📄 db.js
-  📄 index.js
-  📁 routes/
-    📄 analyzeRepo.js
-    📄 chat.js
-    📄 enterprise.js
-    📄 history.js
-    📄 webhooks.js
-  📁 services/
-    📄 agentService.js
-    📄 chatService.js
-    📁 enterprise/
-      📄 edgeResourceManager.js
-      📄 gerritJiraAdapters.js
-      📄 hybridContextMemory.js
-      📄 liveWalkthrough.js
-      📄 sastScanner.js
-      📄 smartDiffChunker.js
-      📄 technicalDebtModel.js
-      📄 treeSitterParser.js
-    📄 heartbeatService.js
-    📄 mcpClient.js
-    📄 repoAnalyzer.js
-    📄 telegramService.js
-📁 temp-repos/
-  📁 ayk7115_freelancer_scheduler/
-📄 test-telegram.js
-📄 test-webhook.js
+Repository: DevMinds
+Files: 109
+Directories: 35
+Languages: Other 53, Markdown 8, JavaScript 32, HTML 1, JSON 2, CSS 2, React JSX 11
+Entry points: frontend/src/App.jsx, frontend/src/main.jsx, src/index.js
+API endpoints: GET /api/architecture, GET /health, POST /, GET io, GET /status, POST /, POST /mock-pr, GET io, POST /gerrit, GET io, POST /jira/sync, POST /ast/index, POST /diff/chunk, POST /debt/snapshot, GET /debt/hotspots, POST /memory/remember, POST /memory/search, GET /, GET /status, POST /telegram/test, POST /github, GET io
+Database tables: insights, analysis_runs, analysis_run_logs, integration_events, jira_transitions, ast_symbols, technical_debt_snapshots, pr_vectors, diff_chunks, sast_findings
+Frontend components: 7
+Backend services: 17
+Detected risks: Multiple package.json files exist without a workspace manifest.

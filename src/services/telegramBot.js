@@ -108,10 +108,9 @@ const handleMessage = async (message) => {
 
         // Logic borrowed from analyzeRepo.js for consistency
         const repoName = repoUrl.split('/').slice(-2).join('_').replace('.git', '');
-        const tempPath = path.join(path.resolve(), 'temp-repos', `bot_${repoName}`);
+        const tempPath = path.join(path.resolve(), 'temp-repos', `bot_${repoName}_${Date.now()}`);
 
         try {
-            if (fs.existsSync(tempPath)) fs.rmSync(tempPath, { recursive: true, force: true });
             fs.mkdirSync(tempPath, { recursive: true });
             
             const git = simpleGit();

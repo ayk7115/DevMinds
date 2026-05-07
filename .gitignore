@@ -20,6 +20,7 @@ out/
 *.db
 *.sqlite
 devmind.db
+devmind.sqlite
 
 # Logs
 logs
@@ -46,6 +47,9 @@ knowledge/
 brain/
 artifacts/
 scratch/
+.devmind-runtime/
+runtime/
+temp-repos/
 
 # Miscellaneous
 test-webhook.js

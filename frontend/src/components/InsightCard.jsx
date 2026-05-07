@@ -119,18 +119,26 @@ export default function InsightCard({ insights }) {
         </div>
 
         {/* Improvement Plan for Low Scores */}
-        {insights.readinessScore < 85 && (
-          <div className="detail-section" style={{ borderLeftColor: 'var(--warning)', background: 'rgba(245,158,11,0.03)' }}>
-            <div className="detail-title" style={{ color: 'var(--warning)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {insights.readinessScore < 95 && (
+          <div className="detail-section" style={{ borderLeftColor: insights.readinessScore < 70 ? 'var(--error)' : 'var(--warning)', background: insights.readinessScore < 70 ? 'rgba(239,68,68,0.03)' : 'rgba(245,158,11,0.03)' }}>
+            <div className="detail-title" style={{ color: insights.readinessScore < 70 ? 'var(--error)' : 'var(--warning)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Strategic Improvement Plan
             </div>
             <div className="detail-text" style={{ fontSize: '0.85rem' }}>
-              To reach 90+ confidence, the following actions are recommended:
-              <ul style={{ marginTop: '0.5rem', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {insights.readinessScoreBreakdown?.filter(b => b.score < 80).map((b, i) => (
-                  <li key={i}>Address <strong>{b.category}</strong>: {b.rationale || `Improve ${b.category.toLowerCase()} to mitigate deployment risks.`}</li>
-                )) || <li>Perform manual code review and verify security impact.</li>}
-                <li>Execute regression test suite on staging environment.</li>
+              Targeting 95+ confidence. Prioritize these architectural corrections:
+              <ul style={{ marginTop: '0.5rem', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {insights.readinessScoreBreakdown?.filter(b => b.score < 90).map((b, i) => (
+                  <li key={i}>
+                    <span style={{ color: 'white', fontWeight: 600 }}>{b.category} Gap:</span> {b.rationale || `Refactor ${b.category.toLowerCase()} to align with system constraints.`}
+                  </li>
+                ))}
+                {insights.vulnerabilities?.length > 0 && (
+                  <li>
+                    <span style={{ color: 'var(--error)', fontWeight: 600 }}>Critical Fix:</span> Resolve the {insights.vulnerabilities.length} security flags detected in this diff before merging.
+                  </li>
+                )}
+                {!insights.readinessScoreBreakdown && <li>Perform manual code review and verify security impact.</li>}
+                <li>Execute full regression suite in the isolated runner environment.</li>
               </ul>
             </div>
           </div>
@@ -178,7 +186,24 @@ export default function InsightCard({ insights }) {
               <div className="detail-title" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', color: 'var(--error)' }}>
                 <ShieldAlert size={14} /> Security Audit
               </div>
-              <div className="detail-text">{insights.securityRisks}</div>
+              <div className="detail-text">
+                <div style={{ marginBottom: '1rem' }}>{insights.securityRisks}</div>
+                {insights.vulnerabilities && insights.vulnerabilities.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {insights.vulnerabilities.map((v, i) => (
+                      <div key={i} style={{ padding: '0.75rem', background: 'rgba(239,68,68,0.1)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white', marginBottom: '0.25rem' }}>
+                          [{v.severity.toUpperCase()}] {v.id}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{v.message}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.25rem', fontFamily: 'monospace' }}>
+                          File: {v.filePath}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}

@@ -1,8 +1,10 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState, useCallback } from 'react';
-import { FolderGit2, Loader, Package, Code, Search, GitBranch, AlertCircle, Maximize, Minimize, Server, BarChart3 } from 'lucide-react';
+import { FolderGit2, Loader, Package, Code, Search, GitBranch, AlertCircle, Maximize, Minimize, Server, Shield } from 'lucide-react';
 import { ReactFlow, Controls, Background, applyNodeChanges, applyEdgeChanges, MarkerType } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from '@dagrejs/dagre';
+import { apiUrl } from '../services/api';
 
 // --- Dagre Layout Engine ---
 const getLayoutedElements = (nodes, edges) => {
@@ -28,17 +30,17 @@ const getLayoutedElements = (nodes, edges) => {
   };
 };
 
-export default function ArchitectureMapper({ onRepoChange }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function ArchitectureMapper({ analysis, onAnalysisComplete }) {
+  const [data, setData] = useState(analysis || null);
+  const loading = false;
   const [analyzing, setAnalyzing] = useState(false);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [repoUrl, setRepoUrl] = useState('');
   const [error, setError] = useState('');
-  const [repoName, setRepoName] = useState('DevMinds Project');
+  const [repoName, setRepoName] = useState(analysis?.repoName || 'Selected repository');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [activeTab, setActiveTab] = useState('map'); // 'map', 'stack', 'files', 'api'
+  const [activeTab, setActiveTab] = useState('stack');
 
   const applyLayout = (rawNodes, rawEdges) => {
     const { nodes: ln, edges: le } = getLayoutedElements(rawNodes, rawEdges);
@@ -46,18 +48,17 @@ export default function ArchitectureMapper({ onRepoChange }) {
     setEdges(le);
   };
 
-  // Load self-analysis on mount
   useEffect(() => {
-    fetch('http://localhost:3000/api/architecture')
-      .then(res => res.json())
-      .then(json => {
-        setData(json);
-        applyLayout(json.flowNodes || [], json.flowEdges || []);
-        setLoading(false);
-        if (json.repoName) onRepoChange?.(json.repoName);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+    if (!analysis) {
+      setData(null);
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
+    setData(analysis);
+    setRepoName(analysis.repoName || 'Selected repository');
+    applyLayout(analysis.flowNodes || [], analysis.flowEdges || []);
+  }, [analysis]);
 
   const analyzeRepo = async () => {
     if (!repoUrl.trim()) return;
@@ -69,7 +70,7 @@ export default function ArchitectureMapper({ onRepoChange }) {
     setAnalyzing(true);
 
     try {
-      const res = await fetch('http://localhost:3000/api/analyze-repo', {
+      const res = await fetch(apiUrl('/api/analyze-repo'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl })
@@ -79,7 +80,7 @@ export default function ArchitectureMapper({ onRepoChange }) {
       setData(json);
       const name = json.repoName || repoUrl.split('/').slice(-1)[0];
       setRepoName(name);
-      onRepoChange?.(name);
+      onAnalysisComplete?.(json);
       applyLayout(json.flowNodes || [], json.flowEdges || []);
     } catch (err) {
       setError(err.message);
@@ -97,12 +98,13 @@ export default function ArchitectureMapper({ onRepoChange }) {
   const risks = data?.risks || [];
   const dependencies = data?.dependencies || {};
   const moduleGroups = data?.moduleGroups || {};
+  const detectedIntegrations = Object.entries(data?.integrations || {}).filter(([, enabled]) => enabled);
 
   const tabs = [
-    { id: 'map', icon: <FolderGit2 size={16} />, label: 'Architecture Map' },
     { id: 'stack', icon: <Package size={16} />, label: 'Tech Stack' },
     { id: 'files', icon: <Code size={16} />, label: 'File Explanation' },
     { id: 'api', icon: <Server size={16} />, label: 'API Surface' },
+    { id: 'security', icon: <Shield size={16} />, label: 'Security Scan' },
   ];
 
   return (
@@ -196,6 +198,16 @@ export default function ArchitectureMapper({ onRepoChange }) {
             </p>
           </div>
         </div>
+      ) : !data ? (
+        <div className="center-state">
+          <FolderGit2 size={52} className="empty-icon" />
+          <div style={{ textAlign: 'center' }}>
+            <h3 style={{ color: 'white', marginBottom: '0.5rem' }}>Paste a GitHub repo to begin</h3>
+            <p style={{ color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Repo X-Ray will scan only the repository URL you enter here. Architecture, code, APIs, and security details stay empty until that scan finishes.
+            </p>
+          </div>
+        </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '1.5rem' }}>
           
@@ -224,7 +236,7 @@ export default function ArchitectureMapper({ onRepoChange }) {
                     <Controls style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)' }} />
                   </ReactFlow>
                   <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', background: 'rgba(0,0,0,0.5)', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    Logical Flow Graph · Interactive
+                    Logical Flow Graph | Interactive
                   </div>
                 </div>
               )}
@@ -262,16 +274,22 @@ export default function ArchitectureMapper({ onRepoChange }) {
 
                     <section style={{ gridColumn: '1 / -1' }}>
                       <h4 style={{ color: 'var(--success)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Server size={18} /> System Integrations
+                        <Server size={18} /> Detected Integrations
                       </h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                        {Object.entries(data?.integrations || {}).map(([key, enabled]) => (
-                          <div key={key} style={{ padding: '1rem', borderRadius: '12px', background: enabled ? 'rgba(34,197,94,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${enabled ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.05)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ textTransform: 'capitalize', color: enabled ? 'white' : 'var(--text-muted)' }}>{key}</span>
-                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: enabled ? 'var(--success)' : 'rgba(255,255,255,0.1)' }}></div>
-                          </div>
-                        ))}
-                      </div>
+                      {detectedIntegrations.length === 0 ? (
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                          No known external integrations were detected in this repository.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                          {detectedIntegrations.map(([key]) => (
+                            <div key={key} style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ textTransform: 'capitalize', color: 'white' }}>{key}</span>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)' }}></div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </section>
                   </div>
                 </div>
@@ -341,6 +359,35 @@ export default function ArchitectureMapper({ onRepoChange }) {
                 </div>
               )}
 
+              {activeTab === 'security' && (
+                <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+                  <h4 style={{ color: 'var(--error)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Shield size={18} /> Static Analysis Security Findings
+                  </h4>
+                  {data?.vulnerabilities?.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--success)' }}>
+                      No high-risk code patterns detected in this repository.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                      {data?.vulnerabilities?.map((v, index) => (
+                        <div key={index} className="glass-panel" style={{ padding: '1rem 1.5rem', borderLeft: `4px solid var(--${v.severity === 'critical' || v.severity === 'high' ? 'error' : 'warning'})` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                            <span style={{ fontWeight: 700, color: 'white' }}>{v.id}: {v.message}</span>
+                            <span className="badge" style={{ background: `var(--${v.severity === 'critical' || v.severity === 'high' ? 'error' : 'warning'})`, color: 'white', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem', textTransform: 'uppercase' }}>
+                              {v.severity}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                            File: {v.filePath}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
 
             {/* Side Stats Bar */}
@@ -362,9 +409,9 @@ export default function ArchitectureMapper({ onRepoChange }) {
                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>{metrics.dependencies}</div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Libs</div>
                   </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '10px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>{metrics.databaseTables}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Tables</div>
+                  <div style={{ background: 'rgba(239,68,68,0.05)', padding: '0.75rem', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(239,68,68,0.1)' }}>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--error)' }}>{data?.vulnerabilities?.length || 0}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Alerts</div>
                   </div>
                 </div>
               </div>

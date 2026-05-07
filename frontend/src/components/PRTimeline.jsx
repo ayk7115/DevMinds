@@ -1,6 +1,8 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from 'react';
 import { Clock, CheckCircle, AlertTriangle, XCircle, GitPullRequest, FolderGit2 } from 'lucide-react';
 import { socket } from '../services/socket';
+import { apiUrl } from '../services/api';
 
 const parseRawOutput = (rawOutput) => {
   if (!rawOutput) return {};
@@ -17,10 +19,14 @@ export default function PRTimeline({ onSelectInsight, filterRepo }) {
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
+    if (!filterRepo) {
+      setHistory([]);
+      setLoading(false);
+      return;
+    }
+
     const fetchHistory = () => {
-      const url = filterRepo 
-        ? `http://localhost:3000/api/history?repo=${encodeURIComponent(filterRepo)}`
-        : 'http://localhost:3000/api/history';
+      const url = apiUrl(`/api/history?repo=${encodeURIComponent(filterRepo)}`);
         
       fetch(url)
         .then(r => r.json())
@@ -78,7 +84,7 @@ export default function PRTimeline({ onSelectInsight, filterRepo }) {
     <div className="glass-panel" style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div className="panel-header">
         <Clock size={20} />
-        Intelligence Archive · PR Timeline
+        Intelligence Archive | PR Timeline
         <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           {history.length} records
         </span>
@@ -110,9 +116,9 @@ export default function PRTimeline({ onSelectInsight, filterRepo }) {
                 </div>
                 <div className="timeline-meta">
                   <span>@{row.author}</span>
-                  <span>·</span>
+                  <span>|</span>
                   <span>{row.repo_name}</span>
-                  <span>·</span>
+                  <span>|</span>
                   <span>{new Date(row.created_at).toLocaleDateString()}</span>
                 </div>
                 <p className="timeline-summary">{row.summary}</p>
