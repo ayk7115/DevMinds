@@ -6,6 +6,9 @@ https://github.com/ayk7115/DevMinds/releases/download/v1.0.0/DEVMIND.mp4
 PPT LINK:-
 https://github.com/ayk7115/DevMinds/releases/download/v1.0.0/MS.Ramaiah.Institute.of.Technology_DevMinds.pdf
 
+OpenClaw AI Disclosure:-
+https://github.com/ayk7115/DevMinds/releases/download/v1.0.0/OpenClaw_AI_Disclosure.docx
+
 DevMind is a sovereign AI platform designed to transform pull requests and repository scans into actionable intelligence. It provides deep architectural insights, security risk assessments, and stakeholder summaries while keeping your sensitive code entirely on-site.
 
 ## ✨ Key Features
